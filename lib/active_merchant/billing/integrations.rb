@@ -1,4 +1,3 @@
-
 # make the bogus gateway be classified correctly by the inflector
 if defined?(ActiveSupport::Inflector)
   ActiveSupport::Inflector.inflections do |inflect|

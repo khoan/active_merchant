@@ -363,3 +363,8 @@ garanti:
   login: 'paymentuser'
   password: 'userpayment'
   
+bbva_tpv:
+  terminal_id: '12345678'
+  comercial_id: 'B123456789100001'
+  secret_key: '01;06;03;77;06;73;03;0B;05;00;7C;04;07;71;75;74;06;19;6E;6F'
+
