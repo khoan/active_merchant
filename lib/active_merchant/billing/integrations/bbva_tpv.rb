@@ -8,11 +8,13 @@ module ActiveMerchant #:nodoc:
       # this integrated payment method.
       module BbvaTpv 
        
-        mattr_accessor :service_url
-        self.service_url = 'https://w3.grupobbva.com/TLPV/tlpv/TLPV_pub_RecepOpModeloServidor'
+        def self.service_url 
+          'https://w3.grupobbva.com/TLPV/tlpv/TLPV_pub_RecepOpModeloServidor'
+        end
 
-        mattr_accessor :notification_confirmation_url
-        self.notification_confirmation_url = 'https://w3.grupobbva.com/TLPV/tlpv/TLPV_pub_rpcrouter'
+        def notification_confirmation_url
+          'https://w3.grupobbva.com/TLPV/tlpv/TLPV_pub_rpcrouter'
+        end
 
         def self.notification(post)
           Notification.new(post)

@@ -56,7 +56,7 @@ class BbvaTpvHelperTest < Test::Unit::TestCase
   end
 
   def test_desobfustication_of_secret_key
-    assert key = @helper.send(:desobfusticate_secret_key)
+    assert key = BbvaTpv::Helper.desobfusticate_secret_key
     assert_equal "878CC4B6F999740B0633", key   # Key tested with BBVA code!
   end
 

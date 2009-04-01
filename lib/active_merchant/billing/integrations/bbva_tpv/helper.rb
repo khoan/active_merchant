@@ -1,3 +1,5 @@
+require 'net/http'
+
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
     module Integrations #:nodoc:
@@ -25,6 +27,19 @@ module ActiveMerchant #:nodoc:
             # Credentials should be set as a hash containing the fields:
             #  :terminal_id, :comercial_id, :secret_key, :secret_key_data
             attr_accessor :credentials
+
+            def secret_word
+              xor_key = self.credentials[:secret_key] + self.credentials[:comercial_id][0,9] + '***'
+              result = ""
+              self.credentials[:secret_key_data].split(';').each_with_index do |part,i|
+                bin = xor_key[i]
+                bin = bin.ord if bin.respond_to?(:ord) # For ruby 1.9!
+                xor = part.hex ^ bin
+                result += xor.chr
+              end
+              result
+            end
+
           end
 
           mapping :account, :account
@@ -51,6 +66,7 @@ module ActiveMerchant #:nodoc:
             { :peticion => build_xml_sale_request }
           end
 
+
           # Convert the currency to the correct ISO Money Code.
           # Only EUR currently supported!
           def currency=( value )
@@ -75,6 +91,30 @@ module ActiveMerchant #:nodoc:
             add_field mappings[:order], sprintf("%012d", order_id.to_i)
           end
 
+          # Send a manual request for the notification object.
+          # This is used to confirm a purchase if one was not sent by the gateway.
+          def request_notification
+            uri = URI.parse(BbvaTpv.notification_confirmation_url)
+            uri.merge!("?peticion="+build_xml_confirmation_request)
+
+            request = Net::HTTP::Get.new(uri.path)
+
+            # request['Content-Length'] = "0"
+            request['User-Agent'] = "Active Merchant -- http://home.leetsoft.com/am"
+            request['Content-Type'] = "application/x-www-form-urlencoded" 
+
+            http = Net::HTTP.new(uri.host, uri.port)
+            http.verify_mode    = OpenSSL::SSL::VERIFY_NONE unless @ssl_strict
+            http.use_ssl        = true
+
+            response = http.request(request)
+            # Should'nt fail unless something very wrong
+            return nil unless response.is_a? Net::HTTPSuccess
+
+            Notification.new( response.body )
+          end
+
+
           protected
 
           def build_xml_sale_request
@@ -84,7 +124,7 @@ module ActiveMerchant #:nodoc:
               xml.oppago do
                 xml.idterminal creds[:terminal_id]
                 xml.idcomercio creds[:comercial_id]
-                xml.idtransaccion transaction_from_order
+                xml.idtransaccion @fields['idtransaccion']
                 xml.moneda @fields['moneda'] # ISO Money Code
                 xml.importe @fields['importe']
                 xml.urlcomercio @fields['urlcomercio']
@@ -92,23 +132,26 @@ module ActiveMerchant #:nodoc:
                 # xml.pais @fields[:pais] || 'ES' # Not needed
                 xml.urlredir @fields['urlredir']
                 xml.localizador @fields['localizador']
-                xml.firma sign_request( money, options )
+                xml.firma sign_request
               end
             end
             xml.target!
           end
 
-          def desobfusticate_secret_key
+          def build_xml_confirmation_request
+            xml = Builder::XmlMarkup.new :indent => 2
             creds = BbvaTpv::Helper.credentials
-            xor_key = creds[:secret_key] + creds[:comercial_id][0,9] + '***'
-            result = ""
-            creds[:secret_key_data].split(';').each_with_index do |part,i|
-              bin = xor_key[i]
-              bin = bin.ord if bin.respond_to?(:ord) # For ruby 1.9!
-              xor = part.hex ^ bin
-              result += xor.chr
+            xml.tpv do
+              xml.oppago do
+                xml.idterminal creds[:terminal_id]
+                xml.idcomercio creds[:comercial_id]
+                xml.idtransaccion @fields['idtransaccion']
+                xml.moneda @fields['moneda'] # ISO Money Code
+                xml.importe @fields['importe']
+                xml.firma sign_request
+              end
             end
-            result
+            xml.target!
           end
 
           def sign_request
@@ -119,8 +162,8 @@ module ActiveMerchant #:nodoc:
               @fields['idtransaccion'] +
               (@fields['importe'].to_f * 100).to_i.to_s + 
               @fields['moneda'] +
-              @fields['localizador'] +
-              desobfusticate_secret_key
+              (@fields['localizador'] || '') +
+              BbvaTpv::Helper.secret_word
             Digest::SHA1.hexdigest( str )
           end
 
