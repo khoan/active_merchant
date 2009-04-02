@@ -22,6 +22,10 @@ module ActiveMerchant #:nodoc:
         # 
         # The credentials are used to create and the security signature and should be kept secure.
         #
+        # Each transaction request sent REQUIRES a unique ID. Normally, one would expect unique
+        # IDs to be provided by the external service, however this is not the case with the 
+        # BBVA TPV.
+        #
         class Helper < ActiveMerchant::Billing::Integrations::Helper
           class << self
             # Credentials should be set as a hash containing the fields:
@@ -70,13 +74,7 @@ module ActiveMerchant #:nodoc:
           # Convert the currency to the correct ISO Money Code.
           # Only EUR currently supported!
           def currency=( value )
-            code = case value
-                   when 'EUR'
-                     '978'
-                   else
-                     '978'
-                   end
-            add_field mappings[:currency], code 
+            add_field mappings[:currency], BbvaTpv.currency_code(value) 
           end
 
           def amount=(money)
@@ -95,23 +93,23 @@ module ActiveMerchant #:nodoc:
           # This is used to confirm a purchase if one was not sent by the gateway.
           def request_notification
             uri = URI.parse(BbvaTpv.notification_confirmation_url)
-            uri.merge!("?peticion="+build_xml_confirmation_request)
+            # uri.merge!("?peticion="+URI.escape(build_xml_confirmation_request))
 
-            request = Net::HTTP::Get.new(uri.path)
+            body = build_soap_request('consultarOperacion', build_xml_confirmation_request)
+            request = Net::HTTP::Post.new(uri.path)
 
-            # request['Content-Length'] = "0"
+            request['Content-Length'] = #{body.size}
             request['User-Agent'] = "Active Merchant -- http://home.leetsoft.com/am"
-            request['Content-Type'] = "application/x-www-form-urlencoded" 
+            request['Content-Type'] = "text/xml" 
 
             http = Net::HTTP.new(uri.host, uri.port)
             http.verify_mode    = OpenSSL::SSL::VERIFY_NONE unless @ssl_strict
             http.use_ssl        = true
 
-            response = http.request(request)
-            # Should'nt fail unless something very wrong
-            return nil unless response.is_a? Net::HTTPSuccess
+            response = http.request(request, body)
+            #return nil unless response.is_a? Net::HTTPSuccess
 
-            Notification.new( response.body )
+            Notification.new( parse_soap_reply('consultaOperacion', response.body) )
           end
 
 
@@ -142,7 +140,7 @@ module ActiveMerchant #:nodoc:
             xml = Builder::XmlMarkup.new :indent => 2
             creds = BbvaTpv::Helper.credentials
             xml.tpv do
-              xml.oppago do
+              xml.opconsulta do
                 xml.idterminal creds[:terminal_id]
                 xml.idcomercio creds[:comercial_id]
                 xml.idtransaccion @fields['idtransaccion']
@@ -152,6 +150,36 @@ module ActiveMerchant #:nodoc:
               end
             end
             xml.target!
+          end
+
+          def build_soap_request( method, body )
+            xml = Builder::XmlMarkup.new :indent => 2
+            xml.instruct!
+            xml.tag! 'SOAP-ENV:Envelope', {
+                'xmlns:SOAP-ENV' => 'http://schemas.xmlsoap.org/soap/envelope/',
+                'xmlns:xsi' => "http://www.w3.org/2001/XMLSchema-instance",
+                'xmlns:xsd' => "http://www.w3.org/2001/XMLSchema"} do
+              xml.tag! 'SOAP-ENV:Body' do
+                xml.tag! method, { 
+                    'SOAP-ENV:encodingStyle' => 'http://schemas.xmlsoap.org/soap/encoding/',
+                    'xmlns' => 'PeticionTPVSoapS' } do
+                  xml.tag! 'mensaje', {'xsi:type'=>'xsd:string'}, body # body.gsub(/</, '&lt;').gsub(/>/, '&gt;')
+                end
+              end
+            end
+            xml.target!
+          end
+
+          def parse_soap_reply(action, xml)
+            # Use simple pattern recognition, and re-add the entities.
+            # This is a bit lame, but its quick and easy!
+            xml = Nokogiri::XML(xml)
+            set = xml.search('return')
+            if ! set.empty?
+              set.first.content.gsub(/&gt;/, '>').gsub(/&lt;/, '<')
+            else
+              'failed'
+            end
           end
 
           def sign_request

@@ -29,6 +29,10 @@ module ActiveMerchant #:nodoc:
             false
           end
 
+          def currency
+            BbvaTpv.currency_from_code( params['moneda'] ) 
+          end
+
           # Status result provided as one of:
           #   'Completed' or 'Failed'
           def status
@@ -40,7 +44,7 @@ module ActiveMerchant #:nodoc:
             if status == 'Completed'
               '0000 - Operación Aceptada'
             else
-              params['coderror'] + ' - ' + params['descerror']
+              params['coderror'].to_s + ' - ' + params['descerror'].to_s
             end
           end
 
@@ -54,7 +58,7 @@ module ActiveMerchant #:nodoc:
           # Example:
           # 
           #   def ipn
-          #     notify = BbvaTpvNotification.new(request.raw_post)
+          #     notify = BbvaTpvNotification.new(params)
           #
           #     if notify.acknowledge 
           #       ... process order ... if notify.complete?
@@ -67,33 +71,39 @@ module ActiveMerchant #:nodoc:
               params['idcomercio'] +
               params['idtransaccion'] +
               gross_cents.to_s +
-              params['moneda'] +
-              params['estado'] +
-              params['coderror'] +
-              params['codautorizacion'] +
+              params['moneda'].to_s +
+              params['estado'].to_s +
+              params['coderror'].to_s +
+              params['codautorizacion'].to_s +
               BbvaTpv::Helper.secret_word
-
             sig = Digest::SHA1.hexdigest(str)
-
-            sig == params['firma']
+            sig.upcase == params['firma'].upcase
           end
 
-            #### NOTE I'm leaving this here for the moment, as it may be useful in the future,
-            #### although I am inclined to have the BBVA API calls done seperatly.
-         
-          
           private
 
-          # Take the posted data and move the relevant data into a hash
-          # Will only take notice of the XML data
+          # Take the posted data and add the main fields into the notification parameter hash.
+          #
+          # This method, in contrast to other payment mechanisms, will accept a hash of CGI
+          # parameters. If this is the case, the expected 'peticion' parameter will be used to extract
+          # the information. Passing a raw query string WILL NOT work here!
+          #
+          # Raw data (String) will be parsed as XML. 
+          #
+          # Searches for the root 'tpv' tag and searches two levels deep for
+          # all the entries.
           def parse(post)
-            @raw = post
-            data = nil
-            if post =~ /(<tpv>.*)$/
-              data = Nokogiri::XML(value)
-              data.search('//tpv/respago/*').each do |item|
-                params[item.name] = item.content
-              end
+            if post.is_a? Hash and ! post[:peticion].to_s.empty?
+              post = post[:peticion]
+            end
+            @raw = post.to_s
+            doc = Nokogiri::XML(@raw)
+            doc.search("//tpv/*/*").each do |item|
+              params[item.name] = item.content
+            end
+            # grab errors seperatly
+            [doc.search("//tpv/coderror").first, doc.search("//tpv/deserror").first].compact.each do |item|
+              params[item.name] = item.content
             end
           end
         end
