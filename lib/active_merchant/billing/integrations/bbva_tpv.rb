@@ -1,12 +1,13 @@
-require File.dirname(__FILE__) + '/bbva_tpv/helper.rb'
-require File.dirname(__FILE__) + '/bbva_tpv/notification.rb'
-
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
     module Integrations #:nodoc:
       # See the BbvaTpv::Helper class for more generic information on usage of
       # this integrated payment method.
       module BbvaTpv 
+
+        autoload :Helper, 'active_merchant/billing/integrations/bbva_tpv/helper.rb'
+        autoload :Return, 'active_merchant/billing/integrations/bbva_tpv/return.rb'
+        autoload :Notification, 'active_merchant/billing/integrations/bbva_tpv/notification.rb'
        
         def self.service_url 
           'https://w3.grupobbva.com/TLPV/tlpv/TLPV_pub_RecepOpModeloServidor'
