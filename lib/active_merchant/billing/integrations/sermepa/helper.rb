@@ -4,11 +4,12 @@ module ActiveMerchant #:nodoc:
       module Sermepa
         # Sermepa/Servired Spanish Virtual POS Gateway
         #
-        # Support for the Spanish point of sale system provided by Sermepa, part of Servired,
+        # Support for the Spanish payment gateway provided by Sermepa, part of Servired,
         # one of the main providers in Spain to Banks and Cajas.
         #
         # Requires the :terminal_id, :commercial_id, and :secret_key to be set in the credentials
-        # before the helper can be used.
+        # before the helper can be used. Credentials may be overwriten when instantiating the helper
+        # if required or instead of the global variable.
         # 
         class Helper < ActiveMerchant::Billing::Integrations::Helper
           include PostsData
@@ -98,6 +99,7 @@ module ActiveMerchant #:nodoc:
 
           # Send a manual request for the notification object.
           # This is used to confirm a purchase if one was not sent by the gateway.
+          # Returns the raw data ready to be sent to a new Notification instance.
           def request_notification
             body = build_xml_confirmation_request
 
@@ -105,9 +107,9 @@ module ActiveMerchant #:nodoc:
             headers['Content-Length'] = body.size.to_s
             headers['User-Agent'] = "Active Merchant -- http://activemerchant.org"
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
-
-            response = ssl_post(Sermepa.operations_url, body, headers)
-            Notification.new response
+  
+            # Return the raw response data
+            ssl_post(Sermepa.operations_url, body, headers)
           end
 
           protected

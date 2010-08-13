@@ -12,7 +12,7 @@ module ActiveMerchant #:nodoc:
         # The helper creates a scope around a payment service helper
         # which provides the specific mapping for that service.
         # 
-        #  <% payment_service_for 1000, 'paypalemail@mystore.com',
+        #  <%= payment_service_for 1000, 'paypalemail@mystore.com',
         #                               :amount => 50.00, 
         #                               :currency => 'CAD', 
         #                               :service => :paypal, 
@@ -44,32 +44,37 @@ module ActiveMerchant #:nodoc:
 
           integration_module = ActiveMerchant::Billing::Integrations.const_get(options.delete(:service).to_s.classify)
 
+          result = []
           if ignore_binding?
-            concat(form_tag(integration_module.service_url, options.delete(:html) || {}))
+            result << form_tag(integration_module.service_url, options.delete(:html) || {})
           else
             concat(form_tag(integration_module.service_url, options.delete(:html) || {}), proc.binding)
           end
-          result = "\n"
           
           service_class = integration_module.const_get('Helper')
           service = service_class.new(order, account, options)
-          yield service
-          
-          result << service.form_fields.collect do |field, value|
-            hidden_field_tag(field, value)
-          end.join("\n")
 
-          result << "\n"
-          result << '</form>' 
+          service.form_fields.each do |field, value|
+            result << hidden_field_tag(field, value)
+          end
 
           if ignore_binding?
-            concat(result)
+            result << capture(service, &proc)
           else
-            concat(result, proc.binding)
+            yield service
+          end
+          
+          result << '</form>'
+
+          if ignore_binding?
+            result.join("\n").html_safe
+          else
+            concat(result.join("\n"), proc.binding)
           end
         end
         
         private
+
         def ignore_binding?
           ActionPack::VERSION::MAJOR >= 3 || (ActionPack::VERSION::MAJOR >= 2 && ActionPack::VERSION::MINOR >= 2)
         end

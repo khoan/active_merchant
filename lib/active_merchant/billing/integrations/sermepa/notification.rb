@@ -71,10 +71,11 @@ module ActiveMerchant #:nodoc:
           # If the transaction was standard 'authorization', calling this method will simply validate
           # the signature received to ensure it has not been falsified.
           #
-          # If the original transaction type was 'deferred_authorization', calling acknowledge
+          # TODO: If the original transaction type was 'deferred_authorization', calling acknowledge
           # will send a request to confirm the payment and finalize the purchase.
           #
-          # Optionally, the secret key can be provided
+          # Optionally, the secret key can be provided, useful when the global credentials
+          # are not being used.
           #
           # Example:
           # 
