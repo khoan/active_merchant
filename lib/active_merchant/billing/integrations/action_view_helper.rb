@@ -54,16 +54,16 @@ module ActiveMerchant #:nodoc:
           service_class = integration_module.const_get('Helper')
           service = service_class.new(order, account, options)
 
-          service.form_fields.each do |field, value|
-            result << hidden_field_tag(field, value)
-          end
-
           if ignore_binding?
             result << capture(service, &proc)
           else
             yield service
           end
-          
+
+          service.form_fields.each do |field, value|
+            result << hidden_field_tag(field, value)
+          end
+         
           result << '</form>'
 
           if ignore_binding?
