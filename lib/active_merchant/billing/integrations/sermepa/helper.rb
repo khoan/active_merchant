@@ -10,6 +10,25 @@ module ActiveMerchant #:nodoc:
         # Requires the :terminal_id, :commercial_id, and :secret_key to be set in the credentials
         # before the helper can be used. Credentials may be overwriten when instantiating the helper
         # if required or instead of the global variable.
+        #
+        # Ensure the gateway is configured correctly. Synchronization should be set to Asynchronous
+        # and the parameters in URL option (Parámetros en las URLs) should be set to true unless
+        # the notify_url is provided. During development on localhost ensuring this option is set
+        # is especially important as there is no other way to confirm a successful purchase.
+        #
+        # Your view for a payment form might look something like the following:
+        #
+        #   <%= payment_service_for @transaction.id, 'Company name', :amount => @transaction.amount, :currency => 'EUR', :service => :sermepa do |service| %>
+        #     <% service.description     @sale.description %>
+        #     <% service.customer_name   @sale.client.name %>
+        #     <% service.notify_url      notify_sale_url(@sale) %>
+        #     <% service.success_url     win_sale_url(@sale) %>
+        #     <% service.failure_url     fail_sale_url(@sale) %>
+        #    
+        #     <%= submit_tag "PAY!" %>
+        #   <% end %>
+        #
+        #
         # 
         class Helper < ActiveMerchant::Billing::Integrations::Helper
           include PostsData
@@ -20,13 +39,13 @@ module ActiveMerchant #:nodoc:
             attr_accessor :credentials
           end
 
-          mapping :account,     'Ds_Merchant_MerchantCode'
+          mapping :account,     'Ds_Merchant_MerchantName'
 
           mapping :currency,    'Ds_Merchant_Currency'
           mapping :amount,      'Ds_Merchant_Amount'
        
           mapping :order,       'Ds_Merchant_Order'
-          mapping :description, 'Ds_Merchant_Product_Description'
+          mapping :description, 'Ds_Merchant_ProductDescription'
           mapping :client,      'Ds_Merchant_Titular'
 
           mapping :notify_url,  'Ds_Merchant_MerchantURL'
@@ -35,22 +54,23 @@ module ActiveMerchant #:nodoc:
 
           mapping :language,    'Ds_Merchant_ConsumerLanguage'
 
-          mapping :transaction, 'Ds_Merchant_TransactionType'
+          mapping :transaction_type, 'Ds_Merchant_TransactionType'
+
+          mapping :customer_name, 'Ds_Merchant_Titular' 
 
           #### Special Request Specific Fields ####
           mapping :signature,   'Ds_Merchant_MerchantSignature'
-          mapping :terminal,    'Ds_Merchant_Terminal'
           ########
 
           # ammount should always be provided in cents!
           def initialize(order, account, options = {})
             self.credentials = options.delete(:credentials) if options[:credentials]
+            super(order, account, options)
 
-            # Replace account with commercial_id
-            super(order, credentials[:commercial_id], options)
-
-            add_field mappings[:transaction], '0' # Default Transaction Type
-            add_field mappings[:terminal], credentials[:terminal_id]
+            add_field 'Ds_Merchant_MerchantCode', credentials[:commercial_id]
+            add_field 'Ds_Merchant_Terminal', credentials[:terminal_id]
+            #add_field mappings[:transaction_type], '0' # Default Transaction Type
+            self.transaction_type = :authorization
           end
 
           # Allow credentials to be overwritten if needed
@@ -87,8 +107,8 @@ module ActiveMerchant #:nodoc:
             add_field mappings[:language], Sermepa.language_code(lang)
           end
 
-          def transaction=(type)
-            add_field mappings[:transaction], (Sermepa.supported_transactions.assoc(type) || [])[1]
+          def transaction_type=(type)
+            add_field mappings[:transaction_type], Sermepa.transaction_code(type)
           end
 
           def form_fields
@@ -97,11 +117,11 @@ module ActiveMerchant #:nodoc:
           end
 
 
-          # Send a manual request for the notification object.
-          # This is used to confirm a purchase if one was not sent by the gateway.
-          # Returns the raw data ready to be sent to a new Notification instance.
-          def request_notification
-            body = build_xml_confirmation_request
+          # Send a manual request for the currently prepared transaction.
+          # This is an alternative to the normal view helper and is useful
+          # for special types of transaction.
+          def send_transaction
+            body = build_xml_request
 
             headers = { }
             headers['Content-Length'] = body.size.to_s
@@ -109,24 +129,24 @@ module ActiveMerchant #:nodoc:
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
   
             # Return the raw response data
-            ssl_post(Sermepa.operations_url, body, headers)
+            ssl_post(Sermepa.operations_url, "entrada="+CGI.escape(body), headers)
           end
 
           protected
 
-          def build_xml_confirmation_request
-            self.transaction = :confirmation
+          def build_xml_request
             xml = Builder::XmlMarkup.new :indent => 2
-            xml.datosentrada do
-              xml.ds_version 0.1
-              xml.ds_merchant_currency @fields['Ds_Merchant_Currency']
-              xml.ds_merchant_merchanturl @fields['Ds_Merchant_MerchantURL']
-              xml.ds_merchant_transactiontype @fields['Ds_Merchant_TransactionType']
-              xml.ds_merchant_merchantdata @fields['Ds_Merchant_Product_Description']
-              xml.ds_merchant_terminal credentials[:terminal_id]
-              xml.ds_merchant_merchantcode credentials[:commercial_id]
-              xml.ds_merchant_order @fields['Ds_Merchant_Order']
-              xml.ds_merchant_merchantsignature sign_request
+            xml.DATOSENTRADA do
+              xml.DS_Version 0.1
+              xml.DS_MERCHANT_CURRENCY @fields['Ds_Merchant_Currency']
+              xml.DS_MERCHANT_AMOUNT @fields['Ds_Merchant_Amount']
+              xml.DS_MERCHANT_MERCHANTURL @fields['Ds_Merchant_MerchantURL']
+              xml.DS_MERCHANT_TRANSACTIONTYPE @fields['Ds_Merchant_TransactionType']
+              xml.DS_MERCHANT_MERCHANTDATA @fields['Ds_Merchant_Product_Description']
+              xml.DS_MERCHANT_TERMINAL credentials[:terminal_id]
+              xml.DS_MERCHANT_MERCHANTCODE credentials[:commercial_id]
+              xml.DS_MERCHANT_ORDER @fields['Ds_Merchant_Order']
+              xml.DS_MERCHANT_MERCHANTSIGNATURE sign_request
             end
             xml.target!
           end
@@ -135,8 +155,8 @@ module ActiveMerchant #:nodoc:
           # Generate a signature authenticating the current request.
           # Values included in the signature are determined by the the type of 
           # transaction.
-          def sign_request(strength = :normal)
-            str = (@fields['Ds_Merchant_Amount'].to_f * 100).to_i.to_s +
+          def sign_request
+            str = @fields['Ds_Merchant_Amount'].to_s +
                   @fields['Ds_Merchant_Order'].to_s +
                   @fields['Ds_Merchant_MerchantCode'].to_s +
                   @fields['Ds_Merchant_Currency'].to_s
@@ -144,24 +164,14 @@ module ActiveMerchant #:nodoc:
             case Sermepa.transaction_from_code(@fields['Ds_Merchant_TransactionType'])
             when :recurring_transaction
               str += @fields['Ds_Merchant_SumTotal']
-
-            # Add transaction type for the following requests performed only using XML
-            when :confirmation, :automatic_return, :successive_transaction,
-                 :confirm_authentication, :cancel_preauthorization, :preauthorization,
-                 :deferred_authorization, :confirm_deferred_authorization, :cancel_deferred_authorization,
-                 :initial_recurring_authorization, :successive_recurring_authorization
-              str += @fields['Ds_Merchant_TransactionType']
-              strength = :normal # Force the strength!
             end
 
-            if strength == :extended
-              str += @fields['Ds_Merchant_TransactionType'].to_s +
-                     @fields['Ds_Merchant_MerchantURL'].to_s
-            end
+            str += @fields['Ds_Merchant_TransactionType'].to_s +
+                   @fields['Ds_Merchant_MerchantURL'].to_s # may be blank!
 
             str += credentials[:secret_key]
               
-            Digest::SHA1.hexdigest( str )
+            Digest::SHA1.hexdigest(str)
           end
 
         end

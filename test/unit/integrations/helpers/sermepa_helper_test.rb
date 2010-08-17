@@ -5,12 +5,14 @@ class SermepaHelperTest < Test::Unit::TestCase
   
   def setup
     Sermepa::Helper.credentials = {
-        :terminal_id => '1',
-        :commercial_id => '201920191',
-        :secret_key => 'h2u282kMks01923kmqpo'
+        :terminal_id => '9',
+        :commercial_id => '999008881',
+        :secret_key => 'qwertyasdf0123456789'
     }
-    @helper = Sermepa::Helper.new(29292929, 'cody@example.com', :amount => 1235, :currency => 'EUR')
-    @helper.description = "Store Purchase"
+    @helper = Sermepa::Helper.new('070803113316', 'Comercio Pruebas', :amount => 825, :currency => 'EUR')
+    @helper.description = "Alfombrilla para raton"
+    @helper.customer_name = "Sermepa"
+    @helper.notify_url = "https://sis-t.sermepa.es:25443/sis/pruebaCom.jsp"
   end
 
   def test_credentials_accessible
@@ -24,12 +26,13 @@ class SermepaHelperTest < Test::Unit::TestCase
   end
 
   def test_basic_helper_fields
-    assert_field 'Ds_Merchant_MerchantCode', '201920191'
-    assert_field 'Ds_Merchant_Amount', '12.35'
-    assert_field 'Ds_Merchant_Order', '29292929'
-    assert_field 'Ds_Merchant_Product_Description', 'Store Purchase'
+    assert_field 'Ds_Merchant_MerchantCode', '999008881'
+    assert_field 'Ds_Merchant_Amount', '825'
+    assert_field 'Ds_Merchant_Order', '070803113316'
+    assert_field 'Ds_Merchant_ProductDescription', 'Alfombrilla para raton'
     assert_field 'Ds_Merchant_Currency', '978'
     assert_field 'Ds_Merchant_TransactionType', '0'
+    assert_field 'Ds_Merchant_MerchantName', 'Comercio Pruebas'
   end
   
   def test_unknown_mapping
@@ -56,7 +59,7 @@ class SermepaHelperTest < Test::Unit::TestCase
 
   def test_basic_signing_request
     assert sig = @helper.send(:sign_request)
-    assert_equal "c8392b7874e2994c74fa8bea3e2dff38f3913c46", sig
+    assert_equal "ca2bd747d365b4f0a87c670b270cc390b79670ce", sig
   end
 
   def test_build_xml_confirmation_request
@@ -65,13 +68,13 @@ class SermepaHelperTest < Test::Unit::TestCase
 <datosentrada>
   <ds_version>0.1</ds_version>
   <ds_merchant_currency>978</ds_merchant_currency>
-  <ds_merchant_merchanturl></ds_merchant_merchanturl>
+  <ds_merchant_merchanturl>https://sis-t.sermepa.es:25443/sis/pruebaCom.jsp</ds_merchant_merchanturl>
   <ds_merchant_transactiontype>2</ds_merchant_transactiontype>
-  <ds_merchant_merchantdata>Store Purchase</ds_merchant_merchantdata>
-  <ds_merchant_terminal>1</ds_merchant_terminal>
-  <ds_merchant_merchantcode>201920191</ds_merchant_merchantcode>
-  <ds_merchant_order>29292929</ds_merchant_order>
-  <ds_merchant_merchantsignature>dec4048a3aefefd22798347ee1c1f19011fd47f6</ds_merchant_merchantsignature>
+  <ds_merchant_merchantdata></ds_merchant_merchantdata>
+  <ds_merchant_terminal>9</ds_merchant_terminal>
+  <ds_merchant_merchantcode>999008881</ds_merchant_merchantcode>
+  <ds_merchant_order>070803113316</ds_merchant_order>
+  <ds_merchant_merchantsignature>31a489f23c71c7ddd4745b3b2cca58872f53e255</ds_merchant_merchantsignature>
 </datosentrada>
 EOF
   end
