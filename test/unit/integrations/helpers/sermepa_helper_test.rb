@@ -64,19 +64,10 @@ class SermepaHelperTest < Test::Unit::TestCase
 
   def test_build_xml_confirmation_request
     # This also tests signing the request for differnet transactions
-    assert_equal @helper.send(:build_xml_confirmation_request), <<EOF
-<datosentrada>
-  <ds_version>0.1</ds_version>
-  <ds_merchant_currency>978</ds_merchant_currency>
-  <ds_merchant_merchanturl>https://sis-t.sermepa.es:25443/sis/pruebaCom.jsp</ds_merchant_merchanturl>
-  <ds_merchant_transactiontype>2</ds_merchant_transactiontype>
-  <ds_merchant_merchantdata></ds_merchant_merchantdata>
-  <ds_merchant_terminal>9</ds_merchant_terminal>
-  <ds_merchant_merchantcode>999008881</ds_merchant_merchantcode>
-  <ds_merchant_order>070803113316</ds_merchant_order>
-  <ds_merchant_merchantsignature>31a489f23c71c7ddd4745b3b2cca58872f53e255</ds_merchant_merchantsignature>
-</datosentrada>
-EOF
+    data = @helper.send(:build_xml_request)
+    assert data =~ /<DS_MERCHANT_TRANSACTIONTYPE>0<\/DS_MERCHANT_TRANSACTIONTYPE>/
+    assert data =~ /<DS_MERCHANT_MERCHANTCODE>999008881<\/DS_MERCHANT_MERCHANTCODE>/
+    assert data =~ /<DS_MERCHANT_MERCHANTSIGNATURE>ca2bd747d365b4f0a87c670b270cc390b79670ce<\/DS_MERCHANT_MERCHANTSIGNATURE>/
   end
 
 end
