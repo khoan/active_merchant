@@ -86,7 +86,7 @@ module ActiveMerchant #:nodoc:
             if money.is_a?(String) || cents.to_i <= 0
               raise ArgumentError, 'money amount must be either a Money object or a positive integer in cents.'
             end
-            add_field mappings[:amount], cents
+            add_field mappings[:amount], cents.to_i
           end
 
           def order=(order_id)
