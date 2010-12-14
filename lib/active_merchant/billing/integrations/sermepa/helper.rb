@@ -10,7 +10,10 @@ module ActiveMerchant #:nodoc:
         #
         # Requires the :terminal_id, :commercial_id, and :secret_key to be set in the credentials
         # before the helper can be used. Credentials may be overwriten when instantiating the helper
-        # if required or instead of the global variable.
+        # if required or instead of the global variable. Optionally, the :key_type can also be set to 
+        # either 'sha1_complete' or 'sha1_extended', where the later is the default case. This
+        # is a configurable option in the Sermepa admin which you may or may not be able to access.
+        # If nothing seems to work, try changing this.
         #
         # Ensure the gateway is configured correctly. Synchronization should be set to Asynchronous
         # and the parameters in URL option (Parámetros en las URLs) should be set to true unless
@@ -36,7 +39,7 @@ module ActiveMerchant #:nodoc:
 
           class << self
             # Credentials should be set as a hash containing the fields:
-            #  :terminal_id, :commercial_id, :secret_key
+            #  :terminal_id, :commercial_id, :secret_key, :key_type (optional)
             attr_accessor :credentials
           end
 
@@ -167,8 +170,10 @@ module ActiveMerchant #:nodoc:
               str += @fields['Ds_Merchant_SumTotal']
             end
 
-            str += @fields['Ds_Merchant_TransactionType'].to_s +
-                   @fields['Ds_Merchant_MerchantURL'].to_s # may be blank!
+            if credentials[:key_type].blank? || credentials[:key_type] == 'sha1_extended'
+              str += @fields['Ds_Merchant_TransactionType'].to_s +
+                     @fields['Ds_Merchant_MerchantURL'].to_s # may be blank!
+            end
 
             str += credentials[:secret_key]
               

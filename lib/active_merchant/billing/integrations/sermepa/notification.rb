@@ -89,19 +89,20 @@ module ActiveMerchant #:nodoc:
           #
           #
           def acknowledge(credentials = nil)
+            return false if params['ds_signature'].blank?
             str = 
-              params['ds_amount'] +
-              params['ds_order'] +
-              params['ds_merchantcode'] + 
-              params['ds_currency'] +
-              params['ds_response']
+              params['ds_amount'].to_s +
+              params['ds_order'].to_s +
+              params['ds_merchantcode'].to_s + 
+              params['ds_currency'].to_s +
+              params['ds_response'].to_s
             if xml?
-              str += params['ds_transactiontype'] + params['ds_securepayment']
+              str += params['ds_transactiontype'].to_s + params['ds_securepayment'].to_s
             end
 
             str += (credentials || Sermepa::Helper.credentials)[:secret_key]
             sig = Digest::SHA1.hexdigest(str)
-            sig.upcase == params['ds_signature'].upcase
+            sig.upcase == params['ds_signature'].to_s.upcase
           end
 
           private
