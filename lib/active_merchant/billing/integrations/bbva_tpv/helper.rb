@@ -82,7 +82,7 @@ module ActiveMerchant #:nodoc:
             if money.is_a?(String) or cents.to_i <= 0
               raise ArgumentError, 'money amount must be either a Money object or a positive integer in cents.'
             end
-            add_field mappings[:amount], sprintf("%.2f", cents.to_f/100).sub(/\./, ',')
+            add_field mappings[:amount], sprintf("%.2f", cents.to_f/100)
           end
 
           def order=(order_id)
@@ -188,7 +188,7 @@ module ActiveMerchant #:nodoc:
               creds[:terminal_id].to_s +
               creds[:comercial_id].to_s +
               @fields['idtransaccion'] +
-              (@fields['importe'].to_f * 100).to_i.to_s + 
+              (@fields['importe'].gsub(/[\.,]/, '') +
               @fields['moneda'] +
               (@fields['localizador'] || '') +
               BbvaTpv::Helper.secret_word
