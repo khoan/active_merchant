@@ -181,6 +181,12 @@ module ActiveMerchant #:nodoc:
                     xml.tag! 'n2:Amount', amount(options[:trialamount]), 'currencyID' => options[:currency] || 'USD'
                   end        
                 end
+		if !options[:initamount].blank?
+		  xml.tag! 'n2:ActivationDetails' do
+		    xml.tag! 'n2:InitialAmount', options[:initamount]
+		    xml.tag! 'n2:FailedInitAmountAction', 'ContinueOnFailure'
+		  end
+		end
                 xml.tag! 'n2:AutoBillOutstandingAmount', options[:auto_bill_outstanding] ? 'AddToNextBilling' : 'NoAutoBill'
               end
             end
