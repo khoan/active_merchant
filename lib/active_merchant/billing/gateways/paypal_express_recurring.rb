@@ -183,7 +183,7 @@ module ActiveMerchant #:nodoc:
                 end
 		if !options[:initamount].blank?
 		  xml.tag! 'n2:ActivationDetails' do
-		    xml.tag! 'n2:InitialAmount', options[:initamount]
+		    xml.tag! 'n2:InitialAmount', amount(options[:initamount]), 'currencyID' => options[:currency] || 'USD'
 		    xml.tag! 'n2:FailedInitAmountAction', 'ContinueOnFailure'
 		  end
 		end
