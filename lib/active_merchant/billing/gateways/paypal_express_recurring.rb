@@ -89,6 +89,7 @@ module ActiveMerchant #:nodoc:
               end
               xml.tag! 'n2:ReturnURL', options[:return_url]
               xml.tag! 'n2:CancelURL', options[:cancel_return_url]
+              xml.tag! 'n2:LocaleCode', options[:locale]
             end
           end
         end
